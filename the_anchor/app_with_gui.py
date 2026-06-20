@@ -239,8 +239,7 @@ class IntegratedWorkspaceGUI:
             
             # CRITICAL 12GB VRAM OPTIMIZATIONS
             pipe.enable_model_cpu_offload()
-            pipe.enable_vae_slicing()
-            pipe.enable_vae_tiling()
+            # SVD handles VAE memory natively via decode_chunk_size in the pipe call
 
             self.log(f"Preparing image: {self.svd_img.get()}")
             # Reduced from 1024x576 to 576x320 to prevent OOM

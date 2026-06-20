@@ -212,16 +212,20 @@ class IntegratedWorkspaceGUI:
                 ramp = (progress - 0.25) / 0.75
                 s = strength * float(min(max(ramp, 0.0), 1.0))
                 
-                tmean = lat.mean(dim=1, keepdim=True)
-                var = ((lat - tmean) ** 2).mean(dim=(1, 2), keepdim=True).sqrt()
+                # CRITICAL FIX: Upcast to float32 for variance math to prevent NaN overflow
+                lat_32 = lat.to(torch.float32)
+                
+                tmean = lat_32.mean(dim=1, keepdim=True)
+                var = ((lat_32 - tmean) ** 2).mean(dim=(1, 2), keepdim=True).sqrt()
                 med = var.median()
                 vnorm = var / (med + 1e-6)
                 
                 g = torch.sigmoid((vnorm - var_thr) / 0.25)
-                locked = (1.0 - s) * lat + s * tmean
-                lat = g * lat + (1.0 - g) * locked
+                locked = (1.0 - s) * lat_32 + s * tmean
+                lat_32 = g * lat_32 + (1.0 - g) * locked
                 
-                callback_kwargs["latents"] = lat
+                # Cast back to the original dtype (float16) before handing back to the pipeline
+                callback_kwargs["latents"] = lat_32.to(lat.dtype)
                 
                 # GUI Progress logging injection
                 self.root.after(0, lambda: self.log(f"Rendering step {step + 1}/{total_steps}..."))

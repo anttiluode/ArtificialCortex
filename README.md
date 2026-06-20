@@ -1,5 +1,9 @@
 # The Artificial Cortex
 
+EDIT: Added 'the_anchor'. Some mindblowing glitchy graphics in the live webcam filter. The svd is testing temporal stability 
+but most of the maths landed at known directions. Have yet to try it. There is gui version in the folder that uses the classes
+and definitions from the other files as well. The picture below is not of the app. 
+
 ![pic](pic.png)
 
 ### A trainless, dynamical substrate that computes in waves — four organs of one idea: units that hold time and fire on coincidence, coupled into a field

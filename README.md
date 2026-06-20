@@ -1,5 +1,7 @@
 # The Artificial Cortex
 
+![pic](pic.png)
+
 ### A trainless, dynamical substrate that computes in waves — four organs of one idea: units that hold time and fire on coincidence, coupled into a field
 
 **PerceptionLab / Antti Luode, with Claude (Opus 4.8), in dialogue with Gemini. Helsinki, June 2026.**

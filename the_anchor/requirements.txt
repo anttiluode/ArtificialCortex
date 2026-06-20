@@ -1,0 +1,12 @@
+# --- core de-boiler (run_filter.py, test_anchor.py) — CPU, no GPU ---
+numpy
+scipy
+opencv-python
+matplotlib            # only for test_anchor.py's figure
+
+# --- in-loop SVD gate (run_svd.py) — needs a CUDA GPU ---
+# torch                 # install the build matching your CUDA
+# diffusers>=0.27
+# transformers
+# accelerate
+# pillow

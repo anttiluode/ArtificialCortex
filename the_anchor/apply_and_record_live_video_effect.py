@@ -122,7 +122,7 @@ class IntegratedWorkspaceGUI:
 
     def _webcam_thread(self):
         if not HAS_CV2: return
-        self.webcam_cap = cv2.VideoCapture(1)
+        self.webcam_cap = cv2.VideoCapture(0)
         
         video_writer = None
         frame_width, frame_height = 480, 360 # Fixed processing resolution

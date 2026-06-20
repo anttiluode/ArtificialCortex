@@ -1,13 +1,12 @@
 """
 integrated_app.py — Unified Native GUI for the Cortical Tensor
 ==============================================================
-A single-file interface that imports the libraries natively. No command 
-line required. 
+A single-file interface that imports the libraries natively. 
 
-Tabs:
-  1. Live Webcam: Runs cv2 and the TemporalAnchor directly in the window.
-  2. SVD Anchor: Imports PyTorch/Diffusers to generate image-to-video 
-     with the in-loop cross-frame latent anchor.
+Features:
+- LIVE WEBCAM CASCADE: Stack X temporal anchors to recursively punish time.
+- SVD ANCHOR: Native diffusers generation with GUI progress logging and 
+  12GB VRAM safety optimizations.
 
 PerceptionLab / Antti Luode. Helsinki, 2026. Do not hype. Just show.
 """
@@ -18,7 +17,6 @@ import threading
 import time
 import numpy as np
 import sys
-import os
 
 # Webcam and Image libraries
 try:
@@ -39,8 +37,8 @@ except ImportError:
 class IntegratedWorkspaceGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("PerceptionLab — Native Workspace")
-        self.root.geometry("800x700")
+        self.root.title("PerceptionLab — Native Workspace (Cascade Edition)")
+        self.root.geometry("850x750")
         self.root.configure(bg="#141414")
         
         self.style = ttk.Style()
@@ -52,7 +50,7 @@ class IntegratedWorkspaceGUI:
         # Threads and state
         self.webcam_running = False
         self.webcam_cap = None
-        self.anchor = None
+        self.anchors = [] # Array to hold our cascade of layers
         
         self.build_webcam_tab()
         self.build_svd_tab()
@@ -68,11 +66,11 @@ class IntegratedWorkspaceGUI:
         self.console.configure(state='disabled')
 
     # ==========================================
-    # TAB 1: LIVE WEBCAM FILTER
+    # TAB 1: LIVE WEBCAM FILTER (THE CASCADE)
     # ==========================================
     def build_webcam_tab(self):
         tab = tk.Frame(self.notebook, bg="#1a1a1a")
-        self.notebook.add(tab, text="Live Webcam Filter")
+        self.notebook.add(tab, text="Live Webcam (Cascade)")
         
         # Display Area
         self.lbl_video = tk.Label(tab, bg="black", text="Camera Offline", fg="#555555")
@@ -84,14 +82,19 @@ class IntegratedWorkspaceGUI:
         
         tk.Label(ctrl_frame, text="Slow Hold K:", fg="white", bg="#1a1a1a").grid(row=0, column=0, sticky=tk.W)
         self.k_var = tk.DoubleVar(value=0.08)
-        tk.Scale(ctrl_frame, variable=self.k_var, from_=0.01, to=0.5, resolution=0.01, orient=tk.HORIZONTAL, bg="#1a1a1a", fg="white", length=200).grid(row=0, column=1, padx=10)
+        tk.Scale(ctrl_frame, variable=self.k_var, from_=0.01, to=0.5, resolution=0.01, orient=tk.HORIZONTAL, bg="#1a1a1a", fg="white", length=150).grid(row=0, column=1, padx=10)
         
         tk.Label(ctrl_frame, text="Surprise Thr:", fg="white", bg="#1a1a1a").grid(row=1, column=0, sticky=tk.W)
         self.thr_var = tk.DoubleVar(value=0.06)
-        tk.Scale(ctrl_frame, variable=self.thr_var, from_=0.02, to=0.25, resolution=0.01, orient=tk.HORIZONTAL, bg="#1a1a1a", fg="white", length=200).grid(row=1, column=1, padx=10)
+        tk.Scale(ctrl_frame, variable=self.thr_var, from_=0.02, to=0.25, resolution=0.01, orient=tk.HORIZONTAL, bg="#1a1a1a", fg="white", length=150).grid(row=1, column=1, padx=10)
 
-        self.btn_webcam = tk.Button(ctrl_frame, text="Start Webcam", command=self.toggle_webcam, bg="#2c3e50", fg="white")
-        self.btn_webcam.grid(row=0, column=2, rowspan=2, padx=30, ipadx=10, ipady=10)
+        # DEPTH SLIDER (The Madness Knob)
+        tk.Label(ctrl_frame, text="Layer Depth (X):", fg="#e74c3c", bg="#1a1a1a", font=("Arial", 10, "bold")).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.depth_var = tk.IntVar(value=1)
+        tk.Scale(ctrl_frame, variable=self.depth_var, from_=1, to=20, resolution=1, orient=tk.HORIZONTAL, bg="#1a1a1a", fg="#e74c3c", length=150).grid(row=2, column=1, padx=10, pady=5)
+
+        self.btn_webcam = tk.Button(ctrl_frame, text="Start Webcam", command=self.toggle_webcam, bg="#2c3e50", fg="white", font=("Arial", 10, "bold"))
+        self.btn_webcam.grid(row=0, column=2, rowspan=3, padx=30, ipadx=10, ipady=15)
 
     def toggle_webcam(self):
         if not self.webcam_running:
@@ -105,7 +108,6 @@ class IntegratedWorkspaceGUI:
     def _webcam_thread(self):
         if not HAS_CV2: return
         self.webcam_cap = cv2.VideoCapture(0)
-        self.anchor = TemporalAnchor(K=self.k_var.get(), surprise_thr=self.thr_var.get())
         
         while self.webcam_running:
             ret, frame = self.webcam_cap.read()
@@ -113,28 +115,41 @@ class IntegratedWorkspaceGUI:
                 time.sleep(0.03)
                 continue
             
-            # Keep resolution manageable for live GUI
+            # Keep resolution manageable so we don't melt the CPU when running 20 layers
             frame = cv2.resize(frame, (480, 360))
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
             
-            # Update params live
-            self.anchor.K = self.k_var.get()
-            self.anchor.surprise_thr = self.thr_var.get()
+            # 1. Manage the Cascade Depth
+            target_depth = self.depth_var.get()
             
-            out, gate, energy = self.anchor.step(rgb)
-            out_uint8 = (out * 255).astype(np.uint8)
+            # If the slider changed, adjust the array size
+            if len(self.anchors) != target_depth:
+                if len(self.anchors) < target_depth:
+                    for _ in range(target_depth - len(self.anchors)):
+                        self.anchors.append(TemporalAnchor(K=self.k_var.get(), surprise_thr=self.thr_var.get()))
+                else:
+                    self.anchors = self.anchors[:target_depth]
+            
+            # 2. Push the frame through the cascade
+            out = rgb
+            for layer in self.anchors:
+                layer.K = self.k_var.get()
+                layer.surprise_thr = self.thr_var.get()
+                out, _, _ = layer.step(out)
             
             # Render to Tkinter
+            out_uint8 = (out * 255).astype(np.uint8)
             img = ImageTk.PhotoImage(Image.fromarray(out_uint8))
             self.root.after(0, self._update_webcam_lbl, img)
-            time.sleep(1/30.0)
+            
+            time.sleep(1/60.0)
             
         self.webcam_cap.release()
         self.root.after(0, lambda: self.lbl_video.config(image='', text="Camera Offline"))
 
     def _update_webcam_lbl(self, img):
         self.lbl_video.config(image=img)
-        self.lbl_video.image = img
+        self.lbl_video.image = img # Keep reference to prevent GC
 
     # ==========================================
     # TAB 2: SVD GENERATOR (NO PROMPT)
@@ -148,18 +163,15 @@ class IntegratedWorkspaceGUI:
         frame_inputs = tk.Frame(tab, bg="#1a1a1a")
         frame_inputs.pack(fill=tk.X, padx=20, pady=10)
         
-        # Image input
         self.svd_img = tk.StringVar()
         tk.Label(frame_inputs, text="Source Image:", fg="white", bg="#1a1a1a").grid(row=0, column=0, sticky=tk.W)
         tk.Entry(frame_inputs, textvariable=self.svd_img, width=40).grid(row=0, column=1, padx=10)
         tk.Button(frame_inputs, text="Browse", command=lambda: self.svd_img.set(filedialog.askopenfilename())).grid(row=0, column=2)
 
-        # Output Target
         self.svd_out = tk.StringVar(value="svd_anchored.mp4")
         tk.Label(frame_inputs, text="Output Target:", fg="white", bg="#1a1a1a").grid(row=1, column=0, sticky=tk.W, pady=10)
         tk.Entry(frame_inputs, textvariable=self.svd_out, width=40).grid(row=1, column=1, padx=10)
         
-        # Params
         param_frame = tk.Frame(tab, bg="#1a1a1a")
         param_frame.pack(fill=tk.X, padx=20, pady=10)
 
@@ -171,7 +183,7 @@ class IntegratedWorkspaceGUI:
         self.svd_var = tk.DoubleVar(value=0.6)
         tk.Entry(param_frame, textvariable=self.svd_var, width=6).grid(row=0, column=3, padx=5)
 
-        tk.Button(tab, text="Generate Video", command=self.launch_svd, bg="#27ae60", fg="white", font=("Arial", 12, "bold")).pack(pady=20, ipadx=10, ipady=5)
+        tk.Button(tab, text="Generate Video (12GB VRAM Safe)", command=self.launch_svd, bg="#27ae60", fg="white", font=("Arial", 12, "bold")).pack(pady=20, ipadx=10, ipady=5)
 
     def launch_svd(self):
         if not self.svd_img.get():
@@ -189,7 +201,6 @@ class IntegratedWorkspaceGUI:
             self.log("ERROR: Could not import torch or diffusers. Are they installed?")
             return
 
-        # SVD Latent Gate Logic
         def make_anchor_callback(total_steps, strength, var_thr):
             def callback(pipe, step, timestep, callback_kwargs):
                 lat = callback_kwargs["latents"]
@@ -211,6 +222,10 @@ class IntegratedWorkspaceGUI:
                 lat = g * lat + (1.0 - g) * locked
                 
                 callback_kwargs["latents"] = lat
+                
+                # GUI Progress logging injection
+                self.root.after(0, lambda: self.log(f"Rendering step {step + 1}/{total_steps}..."))
+                
                 return callback_kwargs
             return callback
 
@@ -221,22 +236,29 @@ class IntegratedWorkspaceGUI:
                 torch_dtype=torch.float16, variant="fp16"
             )
             pipe.to("cuda")
+            
+            # CRITICAL 12GB VRAM OPTIMIZATIONS
             pipe.enable_model_cpu_offload()
+            pipe.enable_vae_slicing()
+            pipe.enable_vae_tiling()
 
             self.log(f"Preparing image: {self.svd_img.get()}")
-            image = load_image(self.svd_img.get()).resize((1024, 576))
+            # Reduced from 1024x576 to 576x320 to prevent OOM
+            image = load_image(self.svd_img.get()).resize((576, 320)) 
             
             cb = make_anchor_callback(25, self.svd_str.get(), self.svd_var.get())
             
-            self.log("Generating... (watch console for diffusers progress)")
+            self.log("Generating... (Watch console for progress)")
             gen = torch.manual_seed(0)
             result = pipe(
                 image, num_frames=25, num_inference_steps=25,
                 fps=7, generator=gen,
+                decode_chunk_size=2, # Decode 2 frames at a time instead of all 25
                 callback_on_step_end=cb,
                 callback_on_step_end_tensor_inputs=["latents"]
             )
             
+            self.log("Decoding complete! Saving video...")
             out_path = self.svd_out.get()
             export_to_video(result.frames[0], out_path, fps=7)
             self.log(f"\n[SUCCESS] Saved anchored video to: {out_path}")
@@ -252,7 +274,7 @@ class IntegratedWorkspaceGUI:
         console_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         tk.Label(console_frame, text="Execution Log", fg="#7f8c8d", bg="#1a1a1a").pack(anchor=tk.W)
-        self.console = tk.Text(console_frame, height=10, bg="#0d0d0d", fg="#2ecc71", font=("Consolas", 9), state='disabled')
+        self.console = tk.Text(console_frame, height=8, bg="#0d0d0d", fg="#2ecc71", font=("Consolas", 9), state='disabled')
         self.console.pack(fill=tk.BOTH, expand=True)
 
 if __name__ == '__main__':

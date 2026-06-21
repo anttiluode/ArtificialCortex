@@ -48,19 +48,41 @@ So the answer to Gemini's question is **yes**: the circular coupling bias makes 
 
 ```bash
 pip install numpy scipy matplotlib
-python whorl_field.py            # full run (96x96, 5 seeds) — a few minutes
+python whorl_field.py            # the pinning result (96x96, 5 seeds) — a few minutes
 python whorl_field.py --quick    # 64x64, 3 seeds — fast sanity check
+python whorl_hole.py             # the hole-physics test: soft dip vs no-flux wall
 ```
 
 The figure shows it in one frame: the migration trace (isotropic flat, bias descending to the centre), the pinned core as a dark hole in the amplitude, and the σ-threshold curve.
 
 ---
 
-## The honest part — what the experiment *corrected*
+## The honest part — the hole physics, settled
 
-The expectation (mine, the paper's framing, and Gemini's) was that the **central defect** — a lowered-gain "SSp-un" disk — would *capture* and lock the core, pinning it harder than bias alone. **It does not.** In this substrate a central gain-defect makes pinning *worse* (88% → 18%), nucleating secondary defects and scattering the migrating core; a *deeper* hole is worse still (0% pinned). The pin here is the **circular coupling geometry**, not an anatomical hole.
+The expectation (mine, the paper's framing, Gemini's) was that a central defect — the "SSp-un hole" — would *capture* and lock the core, pinning harder than bias alone. The first test used a **soft defect**: a disk of lowered gain μ. It made pinning *worse* (88% → 18%), nucleating secondary defects and scattering the core. That looked like a clean negative — but it was the wrong hole. A lowered-gain disk is still an *active medium*, just weaker; it sheds phase slips like a rock in a stream.
 
-This is a genuine, preserved negative, and it tempers the paper's correlation cleanly: Ye et al. see spirals *sitting on* the SSp-un defect, and their own discussion is explicit that **the causal direction is untested** — whether the circular architecture drives the spiral or the spiral carves the architecture. This toy votes, weakly, for the first: *the circular wiring alone is sufficient to pin a centred spiral, and the structural hole is not needed (and, crudely modelled, hurts).* A real subcritical hole with a clean boundary might still anchor — that's the next test, not a settled claim.
+So the honest move was to test the *other* kind of hole — a **true no-flux (Neumann) boundary**: the medium removed inside a disk, zero flux across the rim. This is the classic obstacle that pins spiral waves in reaction-diffusion (cardiac scars, inexcitable obstacles). Head to head, σ=10, off-centre spiral, 5 seeds:
+
+| condition | end r | drift | pinned % | # defects |
+|---|---|---|---|---|
+| **bias only (no hole)** | 2.8 | 2.4 | **88%** | 4.7 |
+| bias + soft defect (μ dip) | 6.5 | 3.3 | 18% | 6.0 |
+| bias + no-flux hole (r=5 wall) | 4.9 | 3.8 | 71% | 19.1 |
+
+And the no-flux hole-radius sweep is the whole story in one column — **the core pins to the rim** (settled radius ≈ hole radius):
+
+| hole radius | 2 | 3 | 4 | 5 | 6 | 8 | 10 |
+|---|---|---|---|---|---|---|---|
+| settled core radius | 2.4 | 3.3 | 4.1 | 4.5 | 5.4 | 10.1 | 12.5 |
+| # defects | 7.7 | 11.7 | 15.0 | 18.3 | 21.6 | 29.1 | 35.5 |
+
+So the verdict, in three honest parts:
+
+1. **A no-flux wall genuinely anchors** — it pins the core to its rim. A *small* central wall (r≈2, comparable to the core) therefore holds the core near the centre. This is real structural pinning, and it is what the soft gain-dip cannot do.
+2. **A soft metabolic dip does not anchor** — it scatters. So if SSp-un pins the spiral at all, it must be a *structural* boundary, not a metabolic dip. That is a concrete, falsifiable distinction the toy hands back to the biology.
+3. **Even the wall pays a defect tax**, growing with its circumference; large holes lock the core on a distant rim and flood the field with rim-shed defects. And **circular bias alone is still the cleanest pin** — 88%, the fewest secondary defects, no boundary needed.
+
+The architectural decision that falls out: **rely on the circular wiring as the pin.** It is sufficient, defect-light, and needs no special boundary. The structural hole is at best a small optional hard-anchor; the metabolic-dip reading of SSp-un is ruled out as a pinning mechanism here. This tempers the paper cleanly: the spiral sits *on* SSp-un, but the pin is the chiral wiring — the hole is correlational tissue unless it is specifically a small no-flux wall, and even then the wiring carries the pinning. (Ye et al.'s own discussion states the causal direction is untested; this is a vote, in code that can fail, for the wiring.)
 
 ---
 
@@ -75,13 +97,14 @@ The spiral's identity is its **handedness** — the sign of its winding, drawn g
 **Verified in code (this machine, seeded, reproducible):**
 - a circular coupling bias turns the sheet centre into an attractor for a spiral core: a spiral seeded at radius 13 settles at radius ~2.8 (88% pinned), where the isotropic field leaves it frozen at its seed (0% pinned);
 - the effect has a threshold in σ (off below ~2, on by ~5, saturated by ~10) — the pinning is a property of the coupling geometry, switched on by the bias strength;
-- a lowered-gain central defect does **not** help and degrades pinning (the preserved negative): the pin is the wiring, not the hole.
+- the two hole readings are genuinely different physics: a **soft gain-dip does not anchor** (scatters, 18%), a **true no-flux wall does anchor** (pins the core to its rim, settled radius ≈ hole radius), but pays a rim defect tax growing with size — so circular bias alone remains the cleanest pin;
+- handedness (winding sign, the Chiral Eye's `Im(z·z̄_lag)`) is read off each core directly.
 
 **Borrowed, not invented (textbook):** complex Ginzburg–Landau / coupled oscillators (Aranson & Kramer 2002; Kuramoto); the circular-bias spiral-pinning result and the BKT topological-defect reading (Ye, Steinmetz et al. 2025); neural field theory (Wilson–Cowan; Amari; Bressloff); cortical travelling waves (Muller et al. 2018). The contribution is only the *transplant and the measurement* — the paper's σ expressed as the CGLE handshake, plus the honest hole-vs-wiring test.
 
 **Honest limits — read before believing it:**
 - relative units, Euler integration, a handful of seeds, one regime (`1+bc=+0.75`), one grid;
-- "core" is a phase singularity (winding number ±1), not an action potential; "defect" is a gain-suppressed disk, a crude stand-in for SSp-un, and its negative result may be an artifact of that crudeness — a clean subcritical hole is untested;
+- "core" is a phase singularity (winding number ±1), not an action potential; the soft "defect" is a gain-suppressed disk and the "wall" is a no-flux Neumann hole — both crude stand-ins for SSp-un, and the wall's rim-shed defects are partly a discretisation artifact;
 - the migration is **slow** (thousands of steps for a few cells); the bias is a gentle restoring drift, not a snap;
 - this is `the_tissue`'s coupling biased, **not** the HKT latent self-organising — the literal "does the *trained tensor* grow these" question (Gemini's exact phrasing) needs the bias wired into `the_tensor`'s gamma-field Laplacian or the predictive latent, which is the next build below.
 
@@ -91,10 +114,12 @@ The spiral's identity is its **handedness** — the sign of its winding, drawn g
 
 ## Where it goes next
 
-1. **Into `the_tensor`.** Replace the prescribed plane theta wave with this biased coupling on the slow field, so the held grid prediction is swept by a *pinned spiral* rather than a plane wave — then re-measure energy-on-surprise and PAC. This is the actual answer to Gemini's "does the tensor self-organise it," one rung up from the bare field.
-2. **A clean subcritical hole.** Replace the crude lowered-gain disk with a no-flux boundary hole and ask whether *that* anchors where the gain-defect scattered — settling whether the SSp-un "defect" can pin or only correlates.
-3. **Read the handedness with the Chiral Eye.** Drop `Im(z·z̄_lag)` on the pinned field and confirm it reports the winding sign and the core — making the chiral probe a live spiral-detector, and closing the loop to the arrow-of-time line.
-4. **Somatotopy as the swept map.** Let the pinned spiral sweep a 1-D body order (limb→trunk→face) and ask whether the visiting order recapitulates the somatotopic adjacency the paper reports — the most direct bridge from this architecture to their specific finding.
+The hole question is now **settled** (`whorl_hole.py`): rely on the circular wiring; a structural no-flux wall is an optional small hard-anchor, a metabolic dip is not an anchor at all. So the path is clear:
+
+1. **Into `the_tensor`** (the main event). Replace the prescribed plane theta wave in the tensor's slow field with this circular-biased coupling, so the held grid prediction is swept by a *self-centred, pinned spiral* rather than a rigid plane wave — then re-measure energy-on-surprise and theta–gamma PAC. This is the literal answer to Gemini's "does the *trained tensor* self-organise it," one rung up from the bare field. The whorl proves the slow field *will* hold the pinned clock; the tensor question is whether the fast residual still reads cleanly under a rotating sweep.
+2. **Somatotopy as the swept map.** Let the pinned spiral sweep a 1-D body order (limb→trunk→face) and ask whether the visiting order recapitulates the somatotopic adjacency the paper reports — the most direct bridge from this architecture to their specific finding, and the fusion point of the geometric neuron's held phase, the tissue's chirality, and the chandelier's energy-on-surprise gating.
+3. **Read the handedness with the Chiral Eye.** Drop `Im(z·z̄_lag)` on the pinned field as a live spiral-handedness detector, closing the loop to the arrow-of-time line.
+4. **(Optional) the small structural wall in the tensor.** If a hard anchor is ever wanted, the no-flux peg (matched to core size) is the way — not the gain dip — but the wiring already pins, so this is a luxury, not a need.
 
 ---
 

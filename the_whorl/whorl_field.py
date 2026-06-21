@@ -113,26 +113,37 @@ def seed_spiral(n, off, charge=1, rng=None):
 
 
 def run(n=96, steps=4000, dt=0.05, b=0.5, c=-0.5, D=0.9, mu=1.0, omega=0.0,
-        sigma=1.0, void=0.0, void_r=4.0, seed=1, rec_from=3000,
+        sigma=1.0, void=0.0, void_r=4.0, hole_r=0.0, seed=1, rec_from=3000,
         init="spiral", off_frac=0.28):
     """one CGLE run with circular-biased coupling.
        init='spiral' seeds a single off-centre spiral (the paper's S10H test);
        init='random' seeds noise (the spiral-glass case).
-       void>0 carves a central disk where mu is reduced by `void` (the SSp-un
-       'defect in the medium'); void_r is its radius in cells."""
+       void>0  : SOFT central defect -- a disk where mu is reduced by `void`
+                 (an active region with lowered gain; the 'metabolic dip' reading).
+       hole_r>0: TRUE no-flux structural hole -- a disk of radius hole_r with the
+                 medium removed and zero flux across its rim (the 'structural wall'
+                 reading; the classic obstacle that pins spirals in reaction-diffusion).
+       The two are different physics; we test them head to head."""
     rng = np.random.default_rng(seed)
     ws = build_weights(n, sigma)
+    cy = cx = (n - 1) / 2.0
+    y, x = np.indices((n, n)).astype(float)
     mu_field = np.full((n, n), float(mu))
     if void > 0:
-        y, x = np.indices((n, n)).astype(float)
-        cy = cx = (n - 1) / 2.0
         disk = (x - cx)**2 + (y - cy)**2 <= void_r**2
-        mu_field[disk] = mu - void                 # suppressed gain -> a held core anchor
-    cy = cx = (n - 1) / 2.0
+        mu_field[disk] = mu - void                 # soft gain defect
+    live = None
+    if hole_r > 0:
+        live = ((x - cx)**2 + (y - cy)**2 > hole_r**2).astype(float)  # 1 outside, 0 in hole
+        # renormalise coupling weights over LIVE neighbours only => no-flux at the rim
+        eff = [w * np.roll(np.roll(live, dy, 0), dx, 1) for (dy, dx), w in zip(OFFS, ws)]
+        tot = np.zeros((n, n))
+        for e in eff:
+            tot += e
+        ws = [e / (tot + 1e-12) for e in eff]
     if init == "spiral":
         # vary the off-centre direction per seed so it is not always one direction
         ang = 2 * np.pi * (seed % 8) / 8.0
-        y, x = np.indices((n, n)).astype(float)
         off = off_frac * n
         sx, sy = cx + off * np.cos(ang), cy + off * np.sin(ang)
         rr = np.hypot(x - sx, y - sy)
@@ -143,6 +154,8 @@ def run(n=96, steps=4000, dt=0.05, b=0.5, c=-0.5, D=0.9, mu=1.0, omega=0.0,
     else:
         Z = 0.05 * (rng.standard_normal((n, n)) + 1j * rng.standard_normal((n, n)))
         prev = (cy, cx)
+    if live is not None:
+        Z = Z * live
     traj = []                                 # (step, core_y, core_x, charge, n_defects)
     rec_every = 100
     for t in range(steps):
@@ -150,6 +163,8 @@ def run(n=96, steps=4000, dt=0.05, b=0.5, c=-0.5, D=0.9, mu=1.0, omega=0.0,
         Z = Z + dt * ((mu_field + 1j * omega) * Z
                       - (1 + 1j * c) * (np.abs(Z) ** 2) * Z
                       + D * (1 + 1j * b) * lap)
+        if live is not None:
+            Z = Z * live                      # the hole holds no medium
         if t >= rec_from and (t % rec_every == 0):
             cores = list_cores(Z)
             if cores:

@@ -47,7 +47,7 @@ def main():
     model.eval() # Freeze VAE weights
 
     # 2. Boot the retina (Webcam)
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0) # change to fit the input webcam you want
     if not cap.isOpened():
         print("Error: Could not open webcam.")
         return

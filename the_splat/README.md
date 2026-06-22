@@ -1,6 +1,6 @@
 # The Splat — Live Cortex
 
-![pic](pic.png)
+![pic](live.png)
 
 ### Train a blurry top-down prior, then give it eyes — a webcam feed forces the wave-packets to phase-lock, and you watch the gist sharpen into perception
 

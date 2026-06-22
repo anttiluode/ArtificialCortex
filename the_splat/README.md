@@ -23,22 +23,42 @@ The packets do not have to *invent* the phase, the way the generator did. The we
 
 ---
 
+## The trained model (Hugging Face)
+
+You do not have to train it yourself. The trained weights live on the Hub at **[`Aluode/Neuro_Splat`](https://huggingface.co/Aluode/Neuro_Splat)** (`model.pt`, trained on Oxford Flowers-102 at **image_size 128, 512 packets**). Pull it straight into `runs/splat/model.pt`:
+
+```bash
+pip install huggingface_hub
+python - <<'PY'
+import os, shutil
+from huggingface_hub import hf_hub_download
+os.makedirs("runs/splat", exist_ok=True)
+src = hf_hub_download("Aluode/Neuro_Splat", "model.pt")
+shutil.copy(src, "runs/splat/model.pt")
+print("saved runs/splat/model.pt")
+PY
+```
+
+These weights are `image_size=128, num_packets=512` — pass those flags when you run, or the `state_dict` will not load.
+
+---
+
 ## Run it
 
 ![pic2](recon_200.png)
 
 ```bash
-# 1. train the prior (the generator), or use a model.pt you already trained
+# 1. either pull the trained model from Hugging Face (above), or train your own:
 pip install torch torchvision numpy pillow
 python splat_generator.py --smoke                                   # CPU sanity check first
 python splat_generator.py --dataset flowers --image_size 128 --amp --beta 0.001
 
-# 2. give it eyes
+# 2. give it eyes (use the HF weights or your own model.pt)
 pip install opencv-python
-python live_cortex_perception.py --model_path runs/splat/model.pt --num_packets 512
+python live_cortex_perception.py --model_path runs/splat/model.pt --image_size 128 --num_packets 512
 ```
 
-`--num_packets` must match the `.pt` you trained (the packaged generator defaults to 256; set 512 if that is what you trained). Route any source into the webcam slot with OBS's virtual camera to feed it images instead of a live cam, and change `cv2.VideoCapture(1)` to `(0)` if your camera is on index 0.
+`--num_packets` must match the `.pt` you load (the HF model and the recommended training run are 512; the packaged generator *defaults* to 256). Route any source into the webcam slot with OBS's virtual camera to feed it images instead of a live cam, and change `cv2.VideoCapture(1)` to `(0)` if your camera is on index 0.
 
 **The two knobs that matter**, and the tradeoff between them:
 
@@ -88,6 +108,6 @@ Two honest readings have to sit next to that, because this is where it would be 
 
 ## Lineage
 
-The perception organ of [`the_splat`](../), the live counterpart to its generator. The generator (`splat_generator.py`) is the trained top-down prior; the live cortex (`live_cortex_perception.py`) is reality forcing that prior into focus. It descends from the moiré/Gabor thread and drops into the predictive-coding loop of [`the_video_tensor`](../../the_video_tensor) and [`the_anchor`](../../the_anchor); the floaters point at [`grown_gates`](../../) for the inhibition it lacks. The framing — that the blur was never a failure but a prior waiting for eyes — is Antti Luode's, in dialogue with Gemini; the package, the honest reading, and this document are with Claude (Opus 4.8). MIT.
+The perception organ of [`the_splat`](../), the live counterpart to its generator. The generator (`splat_generator.py`) is the trained top-down prior; the live cortex (`live_cortex_perception.py`) is reality forcing that prior into focus. The trained weights are on the Hub at [`Aluode/Neuro_Splat`](https://huggingface.co/Aluode/Neuro_Splat). It descends from the moiré/Gabor thread and drops into the predictive-coding loop of [`the_video_tensor`](../the_video_tensor) and [`the_anchor`](../the_anchor); the floaters point at [`grown_gates`](../) for the inhibition it lacks. The framing — that the blur was never a failure but a prior waiting for eyes — is Antti Luode's, in dialogue with Gemini; the package, the honest reading, and this document are with Claude (Opus 4.8). MIT.
 
 *The generator dreamed a blurry flower because it had nothing to look at. Open its eyes and reality supplies the phase the dream could not; the packets lock, the gist sharpens, and what they cannot yet coordinate, they see as stars. Do not hype. Do not lie. Just show.*

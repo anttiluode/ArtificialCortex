@@ -1,5 +1,7 @@
 # The Splat — Live Cortex
 
+![pic](pic.png)
+
 ### Train a blurry top-down prior, then give it eyes — a webcam feed forces the wave-packets to phase-lock, and you watch the gist sharpen into perception
 
 **PerceptionLab / Antti Luode, with Claude (Opus 4.8), in dialogue with Gemini. Helsinki, June 2026.**

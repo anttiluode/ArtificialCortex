@@ -25,6 +25,8 @@ The packets do not have to *invent* the phase, the way the generator did. The we
 
 ## Run it
 
+![pic2](recon_200.png)
+
 ```bash
 # 1. train the prior (the generator), or use a model.pt you already trained
 pip install torch torchvision numpy pillow

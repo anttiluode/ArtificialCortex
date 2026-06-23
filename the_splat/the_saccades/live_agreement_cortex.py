@@ -13,18 +13,11 @@ offline demo (saccade_agreement_demo.py). Runs on a webcam.
   agreement (transient) : gated foveal detail in a DECAYING buffer (not stored)
   saccades              : eye -> argmax(surprise) in a window, inhibition of return
 
-Honest status: the MATH here is the same numpy that was measured offline. The
-loop itself I could not run in the sandbox (no webcam, no GPU, no model), so:
-  - it runs live on a blur-prior with ZERO model (verify the mechanism first), and
-  - the model hook is a small, clearly-marked adapter you confirm against your
-    own SplatVAE class -- I did not have your exact model API in this session,
-    so do NOT trust the --model path until the adapter below matches your code.
-
 Run:
   python live_agreement_cortex.py                 # webcam, blur prior, runs now
   python live_agreement_cortex.py --image face.jpg  # still image, no webcam
   python live_agreement_cortex.py --smoke         # synthetic, no webcam/model
-  python live_agreement_cortex.py --model runs/splat/model.pt --num_packets 512
+  python live_agreement_cortex.py --model runs/splat/model.pt --num_packets 512 --image_size 128
 Keys: q quit.  Knobs: --fixations 4 --decay 0.5 --fovea 16
 """
 import argparse, sys
@@ -74,27 +67,41 @@ def blur_gist(gray):
 
 
 class ModelGist:
-    """Adapter to your trained SplatVAE. CHECK these calls against splat_generator.py
-    before trusting --model. I did not have your exact class API in this session."""
-    def __init__(self, path, num_packets):
+    """Adapter to your trained SplatVAE. Wired to handle image_size scaling."""
+    def __init__(self, path, num_packets, image_size):
         import torch, importlib.util, os
         self.torch = torch
         spec = importlib.util.spec_from_file_location("splat_generator", "splat_generator.py")
         sg = importlib.util.module_from_spec(spec); spec.loader.exec_module(sg)
         self.dev = "cuda" if torch.cuda.is_available() else "cpu"
-        # --- ADAPTER: match the next 3 lines to your SplatVAE constructor + forward ---
-        self.model = sg.SplatVAE(num_packets=num_packets).to(self.dev)   # <-- ctor name/args?
+        self.image_size = image_size
+        
+        # Passes the proper image_size so Conv layer dims match your 128x128 checkpoint
+        self.model = sg.SplatVAE(image_size=image_size, num_packets=num_packets).to(self.dev)
         self.model.load_state_dict(torch.load(path, map_location=self.dev))
         self.model.eval()
 
     def __call__(self, gray):
+        import cv2
         t = self.torch
-        x = t.from_numpy(gray).float()[None, None].repeat(1, 3, 1, 1).to(self.dev)
+        h, w = gray.shape
+        
+        # Resize to VAE expected dimensions
+        x_res = cv2.resize(gray, (self.image_size, self.image_size))
+        
+        # Convert 2D grayscale to PyTorch RGB Tensor: (1, 3, H, W)
+        x_t = t.from_numpy(x_res).float()[None, None].repeat(1, 3, 1, 1).to(self.dev)
+        
         with t.no_grad():
-            out = self.model(x)                       # <-- returns recon? (recon, mu, logvar)?
+            out = self.model(x_t)
+            # Handle return tuple: recon is the first element
             recon = out[0] if isinstance(out, (tuple, list)) else out
-        g = recon[0].mean(0).clamp(0, 1).cpu().numpy()  # to gray
-        return g
+            
+        # Extract the model's generated Prior/Gist, convert back to grayscale [0,1]
+        g = recon[0].mean(0).clamp(0, 1).cpu().numpy()
+        
+        # Resize back up to the larger frame size used by the math loop (S, S)
+        return cv2.resize(g, (w, h))
 
 
 # ----- the loop, run once per frame, state persists across frames -----
@@ -149,17 +156,21 @@ def panel(gray, gist, percept, surp, path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model"); ap.add_argument("--num_packets", type=int, default=512)
-    ap.add_argument("--image"); ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--model")
+    ap.add_argument("--num_packets", type=int, default=512)
+    ap.add_argument("--image_size", type=int, default=128)
+    ap.add_argument("--image")
+    ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--cam", type=int, default=0)
     ap.add_argument("--fixations", type=int, default=4)
-    ap.add_argument("--decay", type=float, default=0.5); ap.add_argument("--fovea", type=float, default=16.0)
+    ap.add_argument("--decay", type=float, default=0.5)
+    ap.add_argument("--fovea", type=float, default=16.0)
     a = ap.parse_args()
 
     gist_fn = blur_gist
     if a.model:
-        print("[model] loading via adapter -- verify ModelGist matches your SplatVAE")
-        gist_fn = ModelGist(a.model, a.num_packets)
+        print("[model] loading via adapter -- wiring SplatVAE")
+        gist_fn = ModelGist(a.model, a.num_packets, a.image_size)
 
     loop = AgreementLoop(gist_fn, a.fixations, a.decay, a.fovea)
 

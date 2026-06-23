@@ -1,5 +1,18 @@
 # The Splat — Live Cortex
 
+EDIT: 
+
+I added a second model that was trained on faces using the whole celeba dataset in one flat folder for only 2 epochs! 
+
+https://huggingface.co/Aluode/Neuro_Splat/tree/main/face%20model%20trained%202%20epochs
+
+Only 35 megabytes. 
+
+I am testing it on a video here: 
+
+https://youtu.be/6cQryn4yLXU Amazing results for 35 meg model. 
+
+
 ![pic](live.png)
 
 ### Train a blurry top-down prior, then give it eyes — a webcam feed forces the wave-packets to phase-lock, and you watch the gist sharpen into perception

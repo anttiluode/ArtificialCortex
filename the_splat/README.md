@@ -12,6 +12,11 @@ I am testing it on a video here:
 
 https://youtu.be/6cQryn4yLXU Amazing results for 35 meg model. 
 
+To run that model live like I did on the video: 
+
+python live_cortex_perception.py --model_path runs/splat/model.pt --num_packets 512
+
+Change the model path to fit your disk location. Num packets must be 512.
 
 ![pic](live.png)
 

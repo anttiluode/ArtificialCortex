@@ -1,5 +1,7 @@
 # The Agreement Layer: Foveated Saccadic Perception
 
+Making of video: https://www.youtube.com/watch?v=aD3ud--uZx4 
+
 ![pic](pic.png)
 
 This folder contains the implementation of the **Agreement Layer** architecture—a visual perception engine that models how the brain merges a slow, blurry internal world model (Theta) with high-frequency reality (Gamma) using error-driven saccades and phase-coherence gating.

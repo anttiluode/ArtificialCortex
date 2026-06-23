@@ -1,5 +1,7 @@
 # The Agreement Layer: Foveated Saccadic Perception
 
+![pic](pic.png)
+
 This folder contains the implementation of the **Agreement Layer** architecture—a visual perception engine that models how the brain merges a slow, blurry internal world model (Theta) with high-frequency reality (Gamma) using error-driven saccades and phase-coherence gating.
 
 ![Architecture Diagram](foveated_agreement_layer_architecture.png)
@@ -58,6 +60,8 @@ pip install torch torchvision numpy scipy opencv-python matplotlib
 The 35 MB SplatVAE face-prior model weights (`model.pt`) are hosted on Hugging Face:
 
 **Download:** https://huggingface.co/Aluode/Neuro_Splat/tree/main
+
+(load the model in the sub folder 'face model trained for 2 epochs' 
 
 Place `model.pt` in the same directory as the scripts (or note its path).
 
